@@ -1,0 +1,20 @@
+Get-Disk ==> Retorna os discos visiveis.
+
+$servico = Get-Service AudioSRV  // Guardou um serviço em uma variavel
+$servico.Stop() // parou o serviço
+$servico.Start() // iniciou o serviço
+
+Para executar um script no PowerShell precisa de CommandPrecedence(.\)
+
+Get-Disk -Number 0 | Get-Member // Esse comando retorna uma tabela com as propriedades e metodos disponiveis no objeto retornado por Get-Disk
+
+New-Alias g_v Get-Verb // aqui foi criado um apelido para Get-Verb, no caso g_v, ao fechar o PowerShell o Alias deixa de existir.
+
+gci // Lista arquivos dentro do diretorio raiz em que foi executado, para ver recursivo dentro de outros adicione:
+-Recurse.
+
+    gci -recurse -file |
+        ? Name -like "*.exe" |
+        select `
+            Name, `
+            { "{0:N2}MB" -f ($_.Length / 1MB) } // esse codigo lista todos os executaveis.
