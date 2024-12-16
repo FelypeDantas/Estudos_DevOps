@@ -51,6 +51,3 @@ Este repositório é voltado para estudos pessoais, mas contribuições são bem
 
 **“O aprendizado é uma jornada, não um destino.”**  
 Que este repositório seja um reflexo da minha evolução constante no mundo DevOps!
-```
-
-Você pode personalizar esse `README` com suas informações e ajustar as seções para refletir exatamente o que está no seu repositório. Se precisar de ajuda com algo específico, é só avisar! 😊
