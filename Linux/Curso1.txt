@@ -1,0 +1,3 @@
+com o comando ip addr você tem informações da sua interface de rede.
+
+o comando ip route mostra uma lista de IP das rotas do seu linux.
