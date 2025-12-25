@@ -2,53 +2,56 @@
 SETLOCAL ENABLEDELAYEDEXPANSION
 
 :: ============================
-:: CONFIGURACOES PADRAO
+:: CONFIGURACOES
 :: ============================
 SET LOG_DIR=C:\Logs
-SET LOG_FILE=%LOG_DIR%\restart-service_%DATE:~6,4%-%DATE:~3,2%-%DATE:~0,2%.log
 SET WAIT_TIME=5
+SET MAX_WAIT=60
+SET DRY_RUN=0
+SET EVENT_SOURCE=ServiceRestartScript
 
 :: ============================
-:: VALIDACOES INICIAIS
+:: VALIDA ADMIN
 :: ============================
-IF "%~1"=="" (
-    ECHO Uso correto:
-    ECHO restart-service.bat SERVIDOR1[,SERVIDOR2] "Nome do Servico"
-    EXIT /B 1
+NET SESSION >NUL 2>&1
+IF %ERRORLEVEL% NEQ 0 (
+    ECHO ERRO: Execute como Administrador.
+    EXIT /B 10
 )
 
+:: ============================
+:: PARAMETROS
+:: ============================
+IF "%~1"=="" GOTO MENU
 IF "%~2"=="" (
-    ECHO ERRO: Nome do servico nao informado.
+    ECHO Uso:
+    ECHO restart-service-enterprise.bat SERVIDORES "Servico" [/dryrun]
     EXIT /B 1
 )
+
+IF /I "%~3"=="/dryrun" SET DRY_RUN=1
+
+SET SERVIDORES=%~1
+SET SERVICO=%~2
 
 :: ============================
 :: PREPARA LOG
 :: ============================
-IF NOT EXIST "%LOG_DIR%" (
-    mkdir "%LOG_DIR%"
-)
+IF NOT EXIST "%LOG_DIR%" mkdir "%LOG_DIR%"
 
-ECHO =============================== >> "%LOG_FILE%"
-ECHO Execucao iniciada em %DATE% %TIME% >> "%LOG_FILE%"
-ECHO Servidores: %~1 >> "%LOG_FILE%"
-ECHO Servico: %~2 >> "%LOG_FILE%"
-ECHO =============================== >> "%LOG_FILE%"
+SET LOG_FILE=%LOG_DIR%\restart_%SERVICO%_%DATE:~6,4%-%DATE:~3,2%-%DATE:~0,2%.log
 
-:: ============================
-:: VARIAVEIS
-:: ============================
-SET SERVIDORES=%~1
-SET SERVICO=%~2
+CALL :LOG "Inicio da execucao"
+CALL :LOG "Servidores: %SERVIDORES%"
+CALL :LOG "Servico: %SERVICO%"
+CALL :LOG "DryRun: %DRY_RUN%"
 
 :: ============================
 :: LOOP DE SERVIDORES
 :: ============================
 FOR %%S IN (%SERVIDORES:,= %) DO (
 
-    ECHO.
-    ECHO [%%S] Verificando servico "%SERVICO%"
-    ECHO [%%S] Verificando servico "%SERVICO%" >> "%LOG_FILE%"
+    CALL :LOG "[%%S] Consultando estado do servico"
 
     FOR /F "tokens=3" %%A IN (
         'sc \\%%S query "%SERVICO%" ^| find "STATE"'
@@ -56,51 +59,86 @@ FOR %%S IN (%SERVIDORES:,= %) DO (
 
     IF "!STATE!"=="RUNNING" (
 
-        ECHO [%%S] Servico em execucao. Reiniciando...
-        ECHO [%%S] Servico em execucao. Reiniciando... >> "%LOG_FILE%"
+        CALL :LOG "[%%S] Servico RUNNING"
 
-        sc \\%%S stop "%SERVICO%" >> "%LOG_FILE%" 2>&1
-        timeout /t %WAIT_TIME% > NUL
+        IF "%DRY_RUN%"=="1" (
+            CALL :LOG "[%%S] DRY-RUN: stop/start ignorados"
+        ) ELSE (
 
-        CALL :WAIT_FOR_STATE %%S "%SERVICO%" STOPPED
+            CALL :EVENT "[%%S] Reiniciando servico %SERVICO%"
 
-        sc \\%%S start "%SERVICO%" >> "%LOG_FILE%" 2>&1
-        timeout /t %WAIT_TIME% > NUL
+            sc \\%%S stop "%SERVICO%" >> "%LOG_FILE%" 2>&1
+            CALL :WAIT %%S STOPPED
 
-        CALL :WAIT_FOR_STATE %%S "%SERVICO%" RUNNING
+            sc \\%%S start "%SERVICO%" >> "%LOG_FILE%" 2>&1
+            CALL :WAIT %%S RUNNING
 
-        ECHO [%%S] Servico reiniciado com sucesso!
-        ECHO [%%S] Servico reiniciado com sucesso! >> "%LOG_FILE%"
+            CALL :LOG "[%%S] Servico reiniciado com sucesso"
+        )
 
     ) ELSE (
-
-        ECHO [%%S] Servico nao esta em execucao. Estado atual: !STATE!
-        ECHO [%%S] Servico nao esta em execucao. Estado atual: !STATE! >> "%LOG_FILE%"
-
+        CALL :LOG "[%%S] Estado atual: !STATE!"
     )
 )
 
-ECHO.
-ECHO Execucao finalizada.
-ECHO Execucao finalizada em %DATE% %TIME% >> "%LOG_FILE%"
+CALL :LOG "Execucao finalizada"
 EXIT /B 0
+
+:: ============================
+:: MENU INTERATIVO
+:: ============================
+:MENU
+ECHO ================================
+ECHO  RESTART DE SERVICOS - ENTERPRISE
+ECHO ================================
+SET /P SERVIDORES=Informe os servidores (ex: SRV01,SRV02):
+SET /P SERVICO=Informe o nome do servico:
+SET /P CONFIRMA=Dry run? (S/N):
+
+IF /I "%CONFIRMA%"=="S" SET DRY_RUN=1
+
+GOTO CONTINUE
+
+:CONTINUE
+SHIFT
+SHIFT
+GOTO :EOF
 
 :: ============================
 :: FUNCAO: AGUARDA ESTADO
 :: ============================
-:WAIT_FOR_STATE
+:WAIT
 SET SERVER=%1
-SET SERVICE=%2
-SET EXPECTED=%3
+SET EXPECTED=%2
+SET ELAPSED=0
 
-:CHECK_STATE
+:WAIT_LOOP
 FOR /F "tokens=3" %%A IN (
-    'sc \\%SERVER% query "%SERVICE%" ^| find "STATE"'
+    'sc \\%SERVER% query "%SERVICO%" ^| find "STATE"'
 ) DO SET CURRENT=%%A
 
-IF NOT "%CURRENT%"=="%EXPECTED%" (
-    timeout /t 2 > NUL
-    GOTO CHECK_STATE
+IF "%CURRENT%"=="%EXPECTED%" EXIT /B 0
+
+IF %ELAPSED% GEQ %MAX_WAIT% (
+    CALL :LOG "[%SERVER%] TIMEOUT aguardando %EXPECTED%"
+    EXIT /B 20
 )
 
+timeout /t 2 >NUL
+SET /A ELAPSED+=2
+GOTO WAIT_LOOP
+
+:: ============================
+:: LOG
+:: ============================
+:LOG
+ECHO %DATE% %TIME% - %~1
+ECHO %DATE% %TIME% - %~1 >> "%LOG_FILE%"
+EXIT /B
+
+:: ============================
+:: EVENT VIEWER
+:: ============================
+:EVENT
+EVENTCREATE /T INFORMATION /ID 100 /L APPLICATION /SO "%EVENT_SOURCE%" /D "%~1" >NUL 2>&1
 EXIT /B
