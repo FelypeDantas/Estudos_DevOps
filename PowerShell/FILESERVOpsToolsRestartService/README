@@ -1,0 +1,54 @@
+# Restart Service Enterprise
+
+Ferramenta corporativa para reinicialização segura de serviços Windows
+em servidores locais ou remotos.
+
+---
+
+## ✅ Funcionalidades
+- Reinício de serviços locais ou remotos
+- Suporte a múltiplos servidores
+- Dry-run (simulação)
+- Logs automáticos
+- Event Viewer
+- Timeout de segurança
+- Execução validada como administrador
+
+---
+
+## ▶️ Uso Básico
+
+### Um servidor
+restart-service-enterprise.bat SRV01 "Nome do Servico"
+
+### Vários servidores
+restart-service-enterprise.bat SRV01,SRV02 "Nome do Servico"
+
+### Modo simulação
+restart-service-enterprise.bat SRV01 "Nome do Servico" /dryrun
+
+---
+
+## 📄 Logs
+Os logs são gravados automaticamente em:
+C:\Logs
+
+---
+
+## 🚨 Exit Codes
+0  - Sucesso  
+1  - Parâmetros inválidos  
+10 - Execução sem permissão administrativa  
+20 - Timeout aguardando estado do serviço  
+
+---
+
+## 🛡️ Requisitos
+- Executar como Administrador
+- Acesso RPC ao servidor remoto
+- Permissão de controle do serviço
+
+---
+
+## 👥 Responsável
+Felype Dantas
